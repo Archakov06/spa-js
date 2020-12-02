@@ -89,6 +89,7 @@ var SPA = /** @class */ (function () {
     };
     return SPA;
 }());
+
 var app = {
     tagName: 'div',
     children: [

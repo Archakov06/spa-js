@@ -1,47 +1,58 @@
 interface Options {
   root: string;
-  state?: object;
+  state?: any;
+  app: ElementProps;
 }
 
-class SPA {
+export interface ElementProps {
+  tagName: string;
+  props?: Record<string, any>;
+  children: ElementProps | string | Array<ElementProps | string>;
+}
+
+export class SPA<TState extends Record<string, unknown>> {
   public root: HTMLElement | null;
-  public state: any;
-  public cacheApp: Function | null;
+  public state: TState;
+  private app: ElementProps;
 
   constructor(options: Options) {
     this.root = document.querySelector(options.root);
-    this.state = options.state;
-    this.cacheApp = null;
+
     if (!this.root) {
       throw Error('Root element not found');
     }
-    if (this.state && !(this.state instanceof Object)) {
-      throw Error('State is not object');
-    }
+
+    this.state = options.state;
+    this.app = options.app;
+
+    this.render();
   }
 
   createElement(
-    tagName: string,
-    props: any,
-    children: HTMLElement | string | Array<HTMLElement | string>
-  ) {
+    {
+      tagName,
+      props,
+      children
+    }: ElementProps
+  ): HTMLElement {
     if (!this.root) {
       throw Error('Root element not found');
     }
-
+  
     const elem = document.createElement(tagName);
-
-    const appendChild = (value: HTMLElement | string) => {
-      if (props) {
-        for (const key in props) {
-          const value = props[key];
-          if (props.hasOwnProperty(key) && typeof value === 'string') {
-            elem.setAttribute(key, value);
-          } else if (typeof value === 'function') {
-            elem.addEventListener(key, value);
-          }
+  
+    if (props) {
+      for (const key in props) {
+        const value = props[key];
+        if (props.hasOwnProperty(key) && typeof value === 'string') {
+          elem.setAttribute(key, value);
+        } else if (typeof value === 'function') {
+          elem.addEventListener(key, value);
         }
       }
+    }
+  
+    const appendChild = (value: HTMLElement | string): void => {
       if (value instanceof HTMLElement) {
         elem.appendChild(value);
       }
@@ -49,63 +60,58 @@ class SPA {
         let text = value;
         text = text.replace(/{(.+?)}/gi, match => {
           const key = match.replace(/\{|\}|\s/g, '');
-          return this.state &&
-            Object.prototype.hasOwnProperty.call(this.state, key)
-            ? this.state[key]
+          return this.state && Object.prototype.hasOwnProperty.call(this.state, key)
+            ? this.state[key] as string
             : match;
         });
         elem.innerText = text;
       }
     };
 
+    const appendStringOrElement = (child: string | ElementProps): void => {
+      if (typeof child === 'string') {
+        appendChild(child);
+      } else {
+        appendChild(this.createElement(child));
+      }
+    };
+  
     if (children) {
       if (Array.isArray(children)) {
         for (let i = 0; i < children.length; i++) {
-          appendChild(children[i]);
+          const child = children[i];
+          appendStringOrElement(child);
         }
       } else {
-        appendChild(children);
+        appendStringOrElement(children);
       }
     }
-
+  
     return elem;
   }
 
-  update(newState: any | Function) {
-    const update = () => {
-      if (
-        this.state &&
-        this.state instanceof Object &&
-        newState &&
-        newState instanceof Object &&
-        this.cacheApp
-      ) {
-        this.state = Object.assign({}, this.state, newState);
-        this.render(this.cacheApp);
-      }
-    };
-
+  update(callback: (newState: TState) => TState): void {
     if (
       this.state &&
       this.state instanceof Object &&
-      newState &&
-      newState instanceof Object &&
-      this.cacheApp
+      callback &&
+      callback instanceof Function &&
+      this.root
     ) {
-      update();
+      const newState = callback(this.state);
+      this.state = Object.assign(this.state, newState);
+      this.render();
     }
   }
 
-  render(callback: Function) {
+  render(): void {
     if (this.root) {
-      const app: HTMLElement = callback.call(this);
+      const htmlElem = this.createElement(this.app);
       this.root.innerHTML = '';
-      this.root.appendChild(app);
-      this.cacheApp = callback;
+      this.root.appendChild(htmlElem);
     } else {
       throw Error('Root element not found');
     }
   }
 }
 
-export default SPA;
