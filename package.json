@@ -2,7 +2,7 @@
   "dependencies": {
     "rollup": "^1.21.4",
     "rollup-plugin-livereload": "^1.0.3",
-    "rollup-plugin-serve": "^1.0.1",
+    "rollup-plugin-serve": "^1.0.2",
     "rollup-plugin-typescript2": "^0.24.3",
     "typescript": "^3.6.3"
   },
